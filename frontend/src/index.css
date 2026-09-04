@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Space Grotesk", sans-serif;
+  --font-body: "Inter", sans-serif;
+
+  --color-ink: #0a0a0a;
+  --color-surface: #161616;
+  --color-surface-2: #1e1e1e;
+  --color-border: #2a2a2a;
+  --color-amber: #f5a623;
+  --color-amber-dark: #d9860f;
+  --color-orange: #ff7a1a;
+  --color-muted: #a3a3a3;
+}
+
+@layer components {
+  .input {
+    width: 100%;
+    border-radius: 0.5rem;
+    border: 1px solid var(--color-border);
+    background-color: var(--color-surface-2);
+    padding: 0.625rem 1rem;
+    font-size: 0.875rem;
+    color: white;
+  }
+  .input::placeholder {
+    color: var(--color-muted);
+  }
+  .input:focus {
+    outline: none;
+    border-color: var(--color-amber);
+  }
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    background-color: var(--color-ink);
+    color: white;
+    font-family: var(--font-body);
+  }
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-amber);
+    outline-offset: 2px;
+  }
+}
