@@ -2,7 +2,6 @@ import { useState } from "react"
 import { Link, NavLink, useNavigate } from "react-router-dom"
 import { Search, ShoppingCart, Menu, X, Wrench, User, LogOut, ChevronDown, PackageSearch, CalendarCheck, ShieldCheck } from "lucide-react"
 import { useAuth } from "../context/AuthContext"
-import { ADMIN_EMAIL } from "../config"
 
 const links = [
   { to: "/", label: "Home" },
@@ -15,7 +14,7 @@ export default function Navbar({ cartCount = 0 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const { user, logout } = useAuth()
   const navigate = useNavigate()
-  const isAdmin = user?.email === ADMIN_EMAIL
+  const isAdmin = user?.role === "ADMIN"
 
   function handleLogout() {
     logout()

@@ -1,13 +1,34 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
-import { LogIn, Undo2, Check, X } from "lucide-react"
+import { LogIn, Undo2, Check, X, LoaderCircle } from "lucide-react"
 import { useAuth } from "../context/AuthContext"
 import { useBookings } from "../context/BookingContext"
 import StatusBadge from "../components/StatusBadge"
 
 export default function MyBookings() {
   const { user } = useAuth()
-  const { bookingsForRenter, bookingsForOwner } = useBookings()
+  const { getForRenter, getForOwner } = useBookings()
+  const [rentals, setRentals] = useState([])
+  const [rentedOut, setRentedOut] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!user) return
+    let cancelled = false
+    Promise.all([getForRenter(), getForOwner()])
+      .then(([mine, owner]) => {
+        if (cancelled) return
+        setRentals(mine)
+        setRentedOut(owner)
+      })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user])
+
+  function handleReturned(bookingId, updated) {
+    setRentedOut((prev) => prev.map((b) => (b.id === bookingId ? updated : b)))
+  }
 
   if (!user) {
     return (
@@ -27,35 +48,42 @@ export default function MyBookings() {
     )
   }
 
-  const rentals = bookingsForRenter(user.id)
-  const rentedOut = bookingsForOwner(user.id)
-
   return (
     <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
       <h1 className="font-display text-2xl font-bold tracking-tight">My Bookings</h1>
 
-      <h2 className="mt-8 text-sm font-semibold uppercase tracking-wide text-[var(--color-muted)]">
-        Things I'm renting
-      </h2>
-      {rentals.length === 0 ? (
-        <p className="mt-4 text-sm text-[var(--color-muted)]">
-          No bookings yet —{" "}
-          <Link to="/search" className="text-[var(--color-amber)] hover:underline">browse equipment</Link>.
-        </p>
-      ) : (
-        <div className="mt-4 space-y-3">
-          {rentals.map((b) => <RenterCard key={b.id} booking={b} />)}
+      {loading ? (
+        <div className="mt-10 flex justify-center">
+          <LoaderCircle className="h-5 w-5 animate-spin text-[var(--color-muted)]" />
         </div>
-      )}
-
-      {rentedOut.length > 0 && (
+      ) : (
         <>
-          <h2 className="mt-10 text-sm font-semibold uppercase tracking-wide text-[var(--color-muted)]">
-            My equipment, rented out
+          <h2 className="mt-8 text-sm font-semibold uppercase tracking-wide text-[var(--color-muted)]">
+            Things I'm renting
           </h2>
-          <div className="mt-4 space-y-3">
-            {rentedOut.map((b) => <OwnerCard key={b.id} booking={b} />)}
-          </div>
+          {rentals.length === 0 ? (
+            <p className="mt-4 text-sm text-[var(--color-muted)]">
+              No bookings yet —{" "}
+              <Link to="/search" className="text-[var(--color-amber)] hover:underline">browse equipment</Link>.
+            </p>
+          ) : (
+            <div className="mt-4 space-y-3">
+              {rentals.map((b) => <RenterCard key={b.id} booking={b} />)}
+            </div>
+          )}
+
+          {rentedOut.length > 0 && (
+            <>
+              <h2 className="mt-10 text-sm font-semibold uppercase tracking-wide text-[var(--color-muted)]">
+                My equipment, rented out
+              </h2>
+              <div className="mt-4 space-y-3">
+                {rentedOut.map((b) => (
+                  <OwnerCard key={b.id} booking={b} onReturned={(updated) => handleReturned(b.id, updated)} />
+                ))}
+              </div>
+            </>
+          )}
         </>
       )}
     </div>
@@ -75,8 +103,8 @@ function RenterCard({ booking }) {
         <StatusBadge status={booking.status} />
       </div>
       <div className="mt-3 flex items-center justify-between text-xs text-[var(--color-muted)]">
-        <span>Ref {booking.paymentRef}</span>
-        <span>Total paid ${booking.total}</span>
+        <span>{booking.paymentRef ? `Ref ${booking.paymentRef}` : "Awaiting payment confirmation"}</span>
+        <span>Total ${booking.total}</span>
       </div>
       {booking.status === "COMPLETED" && (
         <p className="mt-2 text-xs text-white/80">
@@ -91,15 +119,26 @@ function RenterCard({ booking }) {
   )
 }
 
-function OwnerCard({ booking }) {
+function OwnerCard({ booking, onReturned }) {
   const { markReturned } = useBookings()
   const [inspecting, setInspecting] = useState(false)
   const [hasDamage, setHasDamage] = useState(false)
   const [damageAmount, setDamageAmount] = useState("")
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState("")
 
-  function handleConfirm() {
-    markReturned(booking.id, { hasDamage, damageAmount: hasDamage ? damageAmount : 0 })
-    setInspecting(false)
+  async function handleConfirm() {
+    setError("")
+    setSubmitting(true)
+    try {
+      const updated = await markReturned(booking.id, { hasDamage, damageAmount })
+      onReturned(updated)
+      setInspecting(false)
+    } catch (err) {
+      setError(err.message || "Couldn't process the return. Try again.")
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -165,10 +204,14 @@ function OwnerCard({ booking }) {
             </div>
           )}
 
+          {error && <p className="mt-2 text-xs text-red-400">{error}</p>}
+
           <button
             onClick={handleConfirm}
-            className="mt-3 w-full rounded-full bg-gradient-to-r from-[var(--color-amber)] to-[var(--color-orange)] py-2 text-xs font-semibold text-[var(--color-ink)]"
+            disabled={submitting}
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[var(--color-amber)] to-[var(--color-orange)] py-2 text-xs font-semibold text-[var(--color-ink)] disabled:opacity-60"
           >
+            {submitting && <LoaderCircle className="h-3.5 w-3.5 animate-spin" />}
             Confirm & refund deposit
           </button>
         </div>

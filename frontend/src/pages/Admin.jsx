@@ -1,14 +1,54 @@
+import { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
-import { ShieldAlert, Check, X } from "lucide-react"
+import { ShieldAlert, Check, X, LoaderCircle } from "lucide-react"
 import { useAuth } from "../context/AuthContext"
 import { useEquipment } from "../context/EquipmentContext"
-import { ADMIN_EMAIL } from "../config"
+import { api } from "../api/client"
 
 export default function Admin() {
   const { user } = useAuth()
-  const { equipment, approveEquipment, rejectEquipment } = useEquipment()
+  const { approveEquipment, rejectEquipment } = useEquipment()
+  const isAdmin = user?.role === "ADMIN"
 
-  const isAdmin = user?.email === ADMIN_EMAIL
+  const [pending, setPending] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [busyId, setBusyId] = useState(null)
+
+  useEffect(() => {
+    if (!isAdmin) return
+    loadPending()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin])
+
+  async function loadPending() {
+    setLoading(true)
+    try {
+      const data = await api.get("/equipment/pending")
+      setPending(data)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleApprove(id) {
+    setBusyId(id)
+    try {
+      await approveEquipment(id)
+      setPending((prev) => prev.filter((i) => i.id !== id))
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  async function handleReject(id) {
+    setBusyId(id)
+    try {
+      await rejectEquipment(id)
+      setPending((prev) => prev.filter((i) => i.id !== id))
+    } finally {
+      setBusyId(null)
+    }
+  }
 
   if (!isAdmin) {
     return (
@@ -18,8 +58,7 @@ export default function Admin() {
         </span>
         <h1 className="mt-5 font-display text-xl font-semibold">Admins only</h1>
         <p className="mt-2 text-sm text-[var(--color-muted)]">
-          For this demo, sign up or log in as <span className="text-white/90">{ADMIN_EMAIL}</span> to
-          reach the equipment review dashboard.
+          Sign up or log in with an admin account to reach the equipment review dashboard.
         </p>
         <Link
           to="/login"
@@ -31,9 +70,6 @@ export default function Admin() {
     )
   }
 
-  const pending = equipment.filter((i) => i.status === "PENDING_REVIEW")
-  const decided = equipment.filter((i) => i.status === "REJECTED" || (i.status === "APPROVED" && i.ownerId))
-
   return (
     <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
       <h1 className="font-display text-2xl font-bold tracking-tight">Equipment Review</h1>
@@ -44,7 +80,12 @@ export default function Admin() {
       <h2 className="mt-8 text-sm font-semibold uppercase tracking-wide text-[var(--color-muted)]">
         Pending ({pending.length})
       </h2>
-      {pending.length === 0 ? (
+
+      {loading ? (
+        <div className="mt-6 flex justify-center">
+          <LoaderCircle className="h-5 w-5 animate-spin text-[var(--color-muted)]" />
+        </div>
+      ) : pending.length === 0 ? (
         <p className="mt-4 text-sm text-[var(--color-muted)]">Nothing waiting on review.</p>
       ) : (
         <div className="mt-4 space-y-4">
@@ -68,15 +109,17 @@ export default function Admin() {
               </div>
               <div className="mt-4 flex gap-2">
                 <button
-                  onClick={() => approveEquipment(item.id)}
-                  className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-gradient-to-r from-[var(--color-amber)] to-[var(--color-orange)] py-2 text-sm font-semibold text-[var(--color-ink)]"
+                  onClick={() => handleApprove(item.id)}
+                  disabled={busyId === item.id}
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-gradient-to-r from-[var(--color-amber)] to-[var(--color-orange)] py-2 text-sm font-semibold text-[var(--color-ink)] disabled:opacity-60"
                 >
-                  <Check className="h-4 w-4" strokeWidth={2.5} />
+                  {busyId === item.id ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" strokeWidth={2.5} />}
                   Approve
                 </button>
                 <button
-                  onClick={() => rejectEquipment(item.id)}
-                  className="flex flex-1 items-center justify-center gap-1.5 rounded-full border border-[var(--color-border)] py-2 text-sm font-medium text-white/90 hover:border-red-500/60 hover:text-red-400"
+                  onClick={() => handleReject(item.id)}
+                  disabled={busyId === item.id}
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-full border border-[var(--color-border)] py-2 text-sm font-medium text-white/90 hover:border-red-500/60 hover:text-red-400 disabled:opacity-60"
                 >
                   <X className="h-4 w-4" strokeWidth={2.5} />
                   Reject
@@ -85,27 +128,6 @@ export default function Admin() {
             </div>
           ))}
         </div>
-      )}
-
-      {decided.length > 0 && (
-        <>
-          <h2 className="mt-10 text-sm font-semibold uppercase tracking-wide text-[var(--color-muted)]">
-            Recently decided
-          </h2>
-          <div className="mt-4 space-y-2">
-            {decided.map((item) => (
-              <div
-                key={item.id}
-                className="flex items-center justify-between rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2.5 text-sm"
-              >
-                <span className="text-white/80">{item.name}</span>
-                <span className={item.status === "APPROVED" ? "text-green-400" : "text-red-400"}>
-                  {item.status === "APPROVED" ? "Approved" : "Rejected"}
-                </span>
-              </div>
-            ))}
-          </div>
-        </>
       )}
     </div>
   )

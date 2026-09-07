@@ -1,110 +1,55 @@
 import { createContext, useContext, useEffect, useState } from "react"
-import { equipment as seedEquipment } from "../data/equipment"
+import { api } from "../api/client"
 
 const EquipmentContext = createContext(null)
 
-const LISTINGS_KEY = "borrowhub_listings"
-
-// --- tiny localStorage "database" -------------------------------------
-// Swap this for a real API call later (e.g. fetch("/api/equipment"))
-// and nothing in the pages/components that consume useEquipment() has to change.
-
-function readListings() {
-  try {
-    return JSON.parse(localStorage.getItem(LISTINGS_KEY)) || []
-  } catch {
-    return []
-  }
-}
-
-function writeListings(listings) {
-  localStorage.setItem(LISTINGS_KEY, JSON.stringify(listings))
-}
-
-// Seed catalog items are treated as already vetted so the browse page
-// isn't empty on first load.
-const seedWithStatus = seedEquipment.map((item) => ({
-  ...item,
-  status: "APPROVED",
-  condition: item.condition || "Good",
-  deposit: item.deposit ?? Math.round(item.pricePerDay * 2.5),
-  existingDamage: item.existingDamage || "",
-  ownerId: null,
-  ownerName: "BorrowHub",
-}))
-
 export function EquipmentProvider({ children }) {
-  const [listings, setListings] = useState(() => readListings())
+  const [liveEquipment, setLiveEquipment] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  async function refreshLive() {
+    try {
+      const data = await api.get("/equipment")
+      setLiveEquipment(data)
+    } catch {
+      // Browse page shows an empty state if this fails — nothing else to do here.
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    writeListings(listings)
-  }, [listings])
+    refreshLive()
+  }, [])
 
-  // Owner-added listings + seed catalog, newest first
-  const equipment = [...listings, ...seedWithStatus]
-
-  // What renters are allowed to browse/book
-  const liveEquipment = equipment.filter((item) => item.status === "APPROVED")
-
-  function addEquipment(item, owner) {
-    const newItem = {
-      id: crypto.randomUUID(),
-      name: item.name.trim(),
-      category: item.category,
-      pricePerDay: Number(item.pricePerDay),
-      deposit: Number(item.deposit) || Math.round(Number(item.pricePerDay) * 2.5),
-      location: item.location.trim(),
-      description: item.description?.trim() || "",
-      condition: item.condition || "Good",
-      existingDamage: item.existingDamage?.trim() || "",
-      rating: 0,
-      reviews: 0,
-      available: true,
-      status: "PENDING_REVIEW",
-      image:
-        item.image?.trim() ||
-        "https://images.unsplash.com/photo-1581092160607-ee22621dd758?q=80&w=800&auto=format&fit=crop",
-      ownerId: owner?.id ?? null,
-      ownerName: owner?.name ?? "You",
-      createdAt: new Date().toISOString(),
-    }
-    setListings((prev) => [newItem, ...prev])
-    return newItem
+  /** Submits a new listing — comes back as PENDING_REVIEW, not yet in liveEquipment. */
+  async function addEquipment(form) {
+    return api.post("/equipment", {
+      name: form.name,
+      category: form.category,
+      pricePerDay: Number(form.pricePerDay),
+      deposit: form.deposit ? Number(form.deposit) : null,
+      location: form.location,
+      image: form.image,
+      condition: form.condition,
+      existingDamage: form.existingDamage,
+      description: form.description,
+    })
   }
 
-  function setStatus(id, status) {
-    setListings((prev) =>
-      prev.map((item) => (String(item.id) === String(id) ? { ...item, status } : item))
-    )
+  async function approveEquipment(id) {
+    const updated = await api.patch(`/equipment/${id}/approve`)
+    await refreshLive()
+    return updated
   }
 
-  function approveEquipment(id) {
-    setStatus(id, "APPROVED")
-  }
-
-  function rejectEquipment(id) {
-    setStatus(id, "REJECTED")
-  }
-
-  function getById(id) {
-    return equipment.find((item) => String(item.id) === String(id))
-  }
-
-  function myListings(userId) {
-    return listings.filter((item) => item.ownerId === userId)
+  async function rejectEquipment(id) {
+    return api.patch(`/equipment/${id}/reject`)
   }
 
   return (
     <EquipmentContext.Provider
-      value={{
-        equipment,
-        liveEquipment,
-        addEquipment,
-        approveEquipment,
-        rejectEquipment,
-        getById,
-        myListings,
-      }}
+      value={{ liveEquipment, loading, refreshLive, addEquipment, approveEquipment, rejectEquipment }}
     >
       {children}
     </EquipmentContext.Provider>

@@ -1,12 +1,23 @@
+import { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
-import { PackagePlus, LogIn } from "lucide-react"
+import { PackagePlus, LogIn, LoaderCircle } from "lucide-react"
 import { useAuth } from "../context/AuthContext"
-import { useEquipment } from "../context/EquipmentContext"
+import { api } from "../api/client"
 import StatusBadge from "../components/StatusBadge"
 
 export default function MyListings() {
   const { user } = useAuth()
-  const { myListings } = useEquipment()
+  const [items, setItems] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!user) return
+    let cancelled = false
+    api.get("/equipment/mine")
+      .then((data) => { if (!cancelled) setItems(data) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [user])
 
   if (!user) {
     return (
@@ -26,8 +37,6 @@ export default function MyListings() {
     )
   }
 
-  const items = myListings(user.id)
-
   return (
     <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
       <div className="flex items-center justify-between">
@@ -41,7 +50,11 @@ export default function MyListings() {
         </Link>
       </div>
 
-      {items.length === 0 ? (
+      {loading ? (
+        <div className="mt-10 flex justify-center">
+          <LoaderCircle className="h-5 w-5 animate-spin text-[var(--color-muted)]" />
+        </div>
+      ) : items.length === 0 ? (
         <p className="mt-10 text-center text-sm text-[var(--color-muted)]">
           You haven't listed anything yet.
         </p>

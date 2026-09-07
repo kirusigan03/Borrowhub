@@ -2,7 +2,9 @@ const STYLES = {
   PENDING_REVIEW: "bg-yellow-500/10 text-yellow-400 border-yellow-500/30",
   APPROVED: "bg-green-500/10 text-green-400 border-green-500/30",
   REJECTED: "bg-red-500/10 text-red-400 border-red-500/30",
+  PENDING_PAYMENT: "bg-yellow-500/10 text-yellow-400 border-yellow-500/30",
   CONFIRMED: "bg-green-500/10 text-green-400 border-green-500/30",
+  FAILED: "bg-red-500/10 text-red-400 border-red-500/30",
   COMPLETED: "bg-[var(--color-muted)]/10 text-[var(--color-muted)] border-[var(--color-border)]",
 }
 
@@ -10,7 +12,9 @@ const LABELS = {
   PENDING_REVIEW: "Pending Review",
   APPROVED: "Live",
   REJECTED: "Rejected",
+  PENDING_PAYMENT: "Awaiting Payment",
   CONFIRMED: "Confirmed",
+  FAILED: "Payment Failed",
   COMPLETED: "Completed",
 }
 

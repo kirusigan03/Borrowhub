@@ -129,8 +129,10 @@ export default function ListEquipment() {
 
     setSubmitting(true)
     try {
-      addEquipment(form, user)
+      await addEquipment(form)
       setSubmitted(true)
+    } catch (err) {
+      setError(err.message || "Something went wrong. Please try again.")
     } finally {
       setSubmitting(false)
     }

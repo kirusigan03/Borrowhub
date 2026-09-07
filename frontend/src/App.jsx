@@ -11,6 +11,8 @@ import MyListings from "./pages/MyListings"
 import MyBookings from "./pages/MyBookings"
 import Cart from "./pages/Cart"
 import Admin from "./pages/Admin"
+import BookingSuccess from "./pages/BookingSuccess"
+import BookingCancelled from "./pages/BookingCancelled"
 import { useCart } from "./context/CartContext"
 
 export default function App() {
@@ -31,6 +33,8 @@ export default function App() {
           <Route path="/my-bookings" element={<MyBookings />} />
           <Route path="/cart" element={<Cart />} />
           <Route path="/admin" element={<Admin />} />
+          <Route path="/booking/success" element={<BookingSuccess />} />
+          <Route path="/booking/cancelled" element={<BookingCancelled />} />
         </Routes>
       </main>
       <Footer />
